@@ -18,9 +18,7 @@
 //githubの画面の場合は、「Raw」というボタンを押せば、このスクリプトをインストールできますよ！
 //そのあと、各七海のページを見てみましょう！
 
-
-//アルファ版です
-//テスター募れるほどの人望がなかった　
+//v1.01 サーバーの負荷対策に2秒のインターバルを追加
 
 (function($){
 
@@ -29,6 +27,9 @@
 
   //自分のPNoを取得
   var MyPNo = getPNoFromURL(location.href);
+
+  //次回取得までのInterval(ミリ秒)
+  var nextLinkInterval = 2000;
 
   $("div.MessagePost").each(function(){
 
@@ -85,18 +86,19 @@
       //印を消す
       $(this).remove();
 
+      //一つ前の日
+      var nextDay = day-1
+      var nextURLKey = "";
+      if ( urlKey == "c" ){
+        nextURLKey = "b";
+      }else{
+        nextURLKey = "b" + nextDay;
+      }
+
       //メッセージ送信元の結果を取得
       var url = "http://www.sssloxia.jp/result/"+urlKey+"/"+pnoFrom+".html"
       $.get( url, function(data,status){
         if (status == "success"){
-          //一つ前の日
-          var nextDay = day-1
-          var nextURLKey = "";
-          if ( urlKey == "c" ){
-            nextURLKey = "b";
-          }else{
-            nextURLKey = "b" + nextDay;
-          }
 
           //該当メッセージを探し出す
           //複数該当する場合は複数持ってくる
@@ -133,22 +135,25 @@
           });
           
           if (foundFlg == true){
-            //更に前のメッセージのリンクを挿入する
-            //day判定
-            //TO FROMを逆転させて次へのリンクを用意
-            insertResLink(loadingSelector,pnoTo,pnoFrom,nextURLKey,nextDay);
-
-            loadingSelector.remove();
+            loadingSelector.text("[取得完了]");
+            setTimeout(insertNextLink, nextLinkInterval);
           }else{
             loadingSelector.before("<a href="+url+">[PNo"+pnoFrom+" DAY"+day+"]</a> ");
             loadingSelector.text("[これ以上前のメッセージはありません]");
           }
           //ログ取得成功時の処理ここまで
         }else{
-          alert("ページの読み込みに失敗しました");
+          loadingSelector.text("[取得に失敗しました]");
+          //alert("ページの読み込みに失敗しました");
         }
       });
 
+      function insertNextLink(){
+        //更に前のメッセージのリンクを挿入する
+        //TO FROMを逆転させて次へのリンクを用意
+        insertResLink(loadingSelector,pnoTo,pnoFrom,nextURLKey,nextDay);
+        loadingSelector.remove();
+      }
     });
   }
 
