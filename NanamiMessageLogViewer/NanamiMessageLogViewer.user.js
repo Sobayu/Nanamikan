@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        七海メッセログビューワー
+// @name        NanamiMessageLogViewer
 // @namespace   Sobayu
 // @description メッセージのやりとりを同じページ上に表示します。
 // @include     http://www.sssloxia.jp/result/c/*.html
