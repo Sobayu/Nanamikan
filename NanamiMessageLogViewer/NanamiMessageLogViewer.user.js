@@ -1,9 +1,10 @@
-// ==UserScript==
+﻿// ==UserScript==
 // @name        NanamiMessageLogViewer
 // @namespace   Sobayu
 // @description メッセージのやりとりを同じページ上に表示します。
 // @include     http://www.sssloxia.jp/result/c/*.html
-// @version     1
+// @require     http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js
+// @version     1.02
 // @grant       none
 // ==/UserScript==
 
@@ -19,6 +20,9 @@
 //そのあと、各七海のページを見てみましょう！
 
 //v1.01 サーバーの負荷対策に2秒のインターバルを追加
+//v1.02 7log様の結果を参照するようにした
+
+//TODO：自分にメッセージを送っている結果を取得すると、ちょっと見た目がおかしくなる？
 
 (function($){
 
@@ -29,7 +33,7 @@
   var MyPNo = getPNoFromURL(location.href);
 
   //次回取得までのInterval(ミリ秒)
-  var nextLinkInterval = 2000;
+  var nextLinkInterval = 1000;
 
   $("div.MessagePost").each(function(){
 
@@ -43,7 +47,6 @@
     var ankerPNo = getPNoFromURL(ankerTag.attr("href"));
 
     ankerTag.children("br").remove();
-    //alert( ankerTag.html() );
     //レスリンクを挿入
     if (isSend){
       //もらったメッセージ
@@ -61,7 +64,12 @@
   }
 
   function getPNoFromURL(url){
-    return url.match( /(\d+).html/ )[1];
+    matchSSS = url.match( /(\d+).html(.*?)/ );
+    if (matchSSS){
+      return matchSSS[1];
+    }else{
+      return ""
+    }
   }
 
   //リンクを挿入
@@ -97,9 +105,12 @@
 
       //メッセージ送信元の結果を取得
       var url = "http://www.sssloxia.jp/result/"+urlKey+"/"+pnoFrom+".html"
+      if (urlKey != "c" && urlKey != "b" ){
+        //前々回より前は7log様の結果を使わせてもらう
+        url = "http://kuri.negi.biz/7log/result"+("0"+day).slice(-2)+"/result/c/"+pnoFrom+".html"
+      }
       $.get( url, function(data,status){
         if (status == "success"){
-
           //該当メッセージを探し出す
           //複数該当する場合は複数持ってくる
           var foundFlg = false;
@@ -108,20 +119,19 @@
             ankerTag.children("br").remove();
             var senderPNo = getPNoFromURL(ankerTag.attr("href"));
             if (senderPNo == pnoTo){
-              ankerTag.attr("href", "http://www.sssloxia.jp/result/"+urlKey+"/"+senderPNo+".html")
+              ankerTag.attr("href", "http://www.sssloxia.jp/result/"+urlKey+"/"+senderPNo+".html");
               //loadingSelector.after( "<br/>" );
               var nextInsertAfterElement = loadingSelector;
               var nextDiv = $(this).next("div");
-              while(1){
-                //div.Wordsを続く限り取得
-                if ( nextDiv.attr("class") == "Words" || nextDiv.attr("name") == "BR" ){
-                  //alert(nextDiv.html());
+              for(var i = 0; i < 100; i++) {
+                //div.Wordsを続く限り取得(Limitあり)
+                //if ( nextDiv.attr("class") == "Words" || nextDiv.attr("name") == "BR" ){
+                if ( nextDiv && nextDiv.attr("class") != "MessagePost"){
                   nextDivTmp = nextDiv.next("div");
                   nextInsertAfterElement.after(nextDiv);
                   nextInsertAfterElement = nextDiv;
                   nextDiv = nextDivTmp;
                 }else{
-                  //alert(nextDiv.html());
                   break;
                 }
               }
@@ -144,7 +154,6 @@
           //ログ取得成功時の処理ここまで
         }else{
           loadingSelector.text("[取得に失敗しました]");
-          //alert("ページの読み込みに失敗しました");
         }
       });
 
@@ -159,3 +168,70 @@
 
 }
 )(jQuery);
+
+//クロスドメイン通信をごまかすために使うやつ
+//jquery.xdomainajax.jsから引用
+//https://github.com/padolsey-archive/jquery.fn/tree/master/cross-domain-ajax
+jQuery.ajax = (function(_ajax){
+    
+    var protocol = location.protocol,
+        hostname = location.hostname,
+        exRegex = RegExp(protocol + '//' + hostname),
+        YQL = 'http' + (/^https/.test(protocol)?'s':'') + '://query.yahooapis.com/v1/public/yql?callback=?',
+        query = 'select * from html where url="{URL}" and xpath="*"';
+    
+    function isExternal(url) {
+        return !exRegex.test(url) && /:\/\//.test(url);
+    }
+    
+    return function(o) {
+        
+        var url = o.url;
+        
+        if ( /get/i.test(o.type) && !/json/i.test(o.dataType) && isExternal(url) ) {
+            
+            // Manipulate options so that JSONP-x request is made to YQL
+            
+            o.url = YQL;
+            o.dataType = 'json';
+            
+            o.data = {
+                q: query.replace(
+                    '{URL}',
+                    url + (o.data ?
+                        (/\?/.test(url) ? '&' : '?') + jQuery.param(o.data)
+                    : '')
+                ),
+                format: 'xml'
+            };
+            
+            // Since it's a JSONP request
+            // complete === success
+            if (!o.success && o.complete) {
+                o.success = o.complete;
+                delete o.complete;
+            }
+            
+            o.success = (function(_success){
+                return function(data) {
+                    
+                    if (_success) {
+                        // Fake XHR callback.
+                        // (この部分だけ改造した)
+                        _success.call(this,  (data.results[0] || '')
+                                // YQL screws with <script>s
+                                // Get rid of them
+                                .replace(/<script[^>]+?\/>|<script(.|\s)*?\/script>/gi, '')
+                        , 'success');
+                    }
+                    
+                };
+            })(o.success);
+            
+        }
+        
+        return _ajax.apply(this, arguments);
+        
+    };
+    
+})(jQuery.ajax);
