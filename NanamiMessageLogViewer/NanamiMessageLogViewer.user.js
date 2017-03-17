@@ -1,5 +1,5 @@
 ﻿// ==UserScript==
-// @name        NanamiMessageLogViewer
+// @name        七海千言
 // @namespace   Sobayu
 // @description メッセージのやりとりを同じページ上に表示します。
 // @include     http://www.sssloxia.jp/result/c/*.html
@@ -21,8 +21,7 @@
 
 //v1.01 サーバーの負荷対策に2秒のインターバルを追加
 //v1.02 7log様の結果を参照するようにした
-
-//TODO：自分にメッセージを送っている結果を取得すると、ちょっと見た目がおかしくなる？
+//v1.03 ツール名を決定
 
 (function($){
 
