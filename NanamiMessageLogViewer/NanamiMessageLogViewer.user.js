@@ -4,7 +4,7 @@
 // @description メッセージのやりとりを同じページ上に表示します。
 // @include     http://www.sssloxia.jp/result/c/*.html
 // @require     http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js
-// @version     1.02
+// @version     1.03
 // @grant       none
 // ==/UserScript==
 
