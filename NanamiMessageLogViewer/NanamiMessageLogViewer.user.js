@@ -2,7 +2,7 @@
 // @name        七海千言
 // @namespace   Sobayu
 // @description メッセージのやりとりを同じページ上に表示します。
-// @include     http://www.sssloxia.jp/result/c/*.html
+// @include     http://www.sssloxia.jp/result/c/*
 // @require     http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js
 // @version     1.1
 // @grant       none
