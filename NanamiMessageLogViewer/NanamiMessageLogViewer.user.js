@@ -4,7 +4,7 @@
 // @description メッセージのやりとりを同じページ上に表示します。
 // @include     http://www.sssloxia.jp/result/c/*.html
 // @require     http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js
-// @version     1.03
+// @version     1.1
 // @grant       none
 // ==/UserScript==
 
@@ -22,6 +22,9 @@
 //v1.01 サーバーの負荷対策に2秒のインターバルを追加
 //v1.02 7log様の結果を参照するようにした
 //v1.03 ツール名を決定
+//v1.1
+//・ドロップダウンリストを追加したので、当日以外のメッセージも直接閲覧可能になりました　→過去から順番に閲覧することも可能
+//・自分・相手両方のメッセージを取得するようにした　→互いにメッセージを送り合っている場合にも対応
 
 (function($){
 
@@ -32,7 +35,7 @@
   var MyPNo = getPNoFromURL(location.href);
 
   //次回取得までのInterval(ミリ秒)
-  var nextLinkInterval = 1000;
+  const nextLinkInterval = 1000;
 
   $("div.MessagePost").each(function(){
 
@@ -49,10 +52,10 @@
     //レスリンクを挿入
     if (isSend){
       //もらったメッセージ
-      insertResLink(ankerTag,ankerPNo,MyPNo,"b",today-1);
+      insertResLinkBar(ankerTag,ankerPNo,MyPNo,today-1,false);
     }else{
       //おくったメッセージ
-      insertResLink(ankerTag,ankerPNo,MyPNo,"c",today);
+      insertResLinkBar(ankerTag,ankerPNo,MyPNo,today,false);
       $(this).after("<br/><br/>");
     }
   });
@@ -71,54 +74,95 @@
     }
   }
 
+  function getURL(day,pno){
+    return day == today ? ("http://www.sssloxia.jp/result/c/"+pno+".html") : 
+             ( (day == today-1) ? ("http://www.sssloxia.jp/result/b/"+pno+".html") :
+              ("http://kuri.negi.biz/7log/result"+("0"+day).slice(-2)+"/result/c/"+pno+".html") );
+  }
+
+  //ResLinkの集合体
+  function insertResLinkBar(selector,pnoFrom,pnoTo,day){
+
+    selector.before("<div class='NMLV_openBar'></div>");
+    var openBar = selector.prev("div.NMLV_openBar")
+
+    var resHTML = "<span class='NMLV_open'><b><u>[＜＜]</u></b></span>"
+    insertResLink(openBar,resHTML,pnoFrom,pnoTo,day);
+    
+    var selHTML = "　<select class='NMLV_daySelect'><option value=0>---</option>"
+    var selectedText="";
+    for (var iDay=1;iDay<=today;iDay++){
+      if (iDay == day){
+        selectedText = " selected";
+      }else{
+        selectedText = "";
+      }
+      selHTML += "<option value="+iDay+selectedText+">DAY"+iDay+"</option>";
+    }
+    selHTML+="</select>"
+
+    openBar.append(selHTML);
+  }
+
+
   //リンクを挿入
   //特定の日のPNo Fromから、PNo Toへのメッセージを挿入
-  function insertResLink(selector,pnoFrom,pnoTo,urlKey,day){
-    //TODO　もうちょっと見た目をわかりやすくする
-    // CSSにするか！
-    var resHTML = "<div class='NMLV_open'><b><u>[＜＜]</u></b></div>"
-    selector.before(resHTML);
-
-    selector.prev("div.NMLV_open").css('cursor','pointer');
-    selector.prev("div.NMLV_open").hover(
+  function insertResLink(openBar,htmlText,pnoFrom,pnoTo,day,bUpstream){
+    openBar.append(htmlText);
+    var resLink = openBar.children("span.NMLV_open:last");
+    resLink.css('cursor','pointer');
+    resLink.hover(
       function () {	$(this).css("color", "#F93");	},
-	    function () {	$(this).css("color", "");	}
+      function () {	$(this).css("color", "");	}
     )
     //レスクリック時
-    selector.prev("div.NMLV_open").click(function(){
+    resLink.click(function(){
+      //Selectで選択された日を取得
+      var selectedDay = $(this).next("select.NMLV_daySelect").val();
+      if ( selectedDay == "0"){
+        retrun;
+      }
+
       //取得中のやつ
-      $(this).before("<div class='NMLV_contents'>[取得中…]</div>");
-      var loadingSelector = $(this).prev("div.NMLV_contents");
+      $(this).parent().before("<div class='NMLV_contents'>[取得中…]</div>");
+      var loadingSelector = $(this).parent().prev("div.NMLV_contents");
 
       //印を消す
-      $(this).remove();
+      $(this).parent().remove();
 
       //一つ前の日
-      var nextDay = day-1
-      var nextURLKey = "";
-      if ( urlKey == "c" ){
-        nextURLKey = "b";
-      }else{
-        nextURLKey = "b" + nextDay;
+      var nextDay = Number(selectedDay)-1;
+      //次の日を見たいとき
+      var bUpstreamNext = bUpstream;
+      if ( Number(selectedDay) > day){
+        bUpstreamNext = true;
+      }
+      if ( Number(selectedDay) < day){
+        bUpstreamNext = false;
+      }
+      if (bUpstreamNext){
+        nextDay = Number(selectedDay)+1;
       }
 
+      day = Number(selectedDay);
+
       //メッセージ送信元の結果を取得
-      var url = "http://www.sssloxia.jp/result/"+urlKey+"/"+pnoFrom+".html"
-      if (urlKey != "c" && urlKey != "b" ){
-        //前々回より前は7log様の結果を使わせてもらう
-        url = "http://kuri.negi.biz/7log/result"+("0"+day).slice(-2)+"/result/c/"+pnoFrom+".html"
-      }
+      var url = getURL(day, pnoFrom);
       $.get( url, function(data,status){
         if (status == "success"){
           //該当メッセージを探し出す
           //複数該当する場合は複数持ってくる
           var foundFlg = false;
           $(data).find("div.MessagePost").each(function(){
+            var sendingText = $(this).text();
+            if ( sendingText.includes("にメッセージを送った。")  ){
+              return true;//eachのcontinue
+            }
             var ankerTag = $(this).prev("a");
             ankerTag.children("br").remove();
             var senderPNo = getPNoFromURL(ankerTag.attr("href"));
             if (senderPNo == pnoTo){
-              ankerTag.attr("href", "http://www.sssloxia.jp/result/"+urlKey+"/"+senderPNo+".html");
+              ankerTag.attr("href", getURL(day,senderPNo) );
               //loadingSelector.after( "<br/>" );
               var nextInsertAfterElement = loadingSelector;
               var nextDiv = $(this).next("div");
@@ -136,30 +180,89 @@
               }
               loadingSelector.after( $(this) );
               loadingSelector.after( ankerTag );
-              //loadingSelector.after( $(this).next("div.Words").html()  );
-              ankerTag.before("<a href="+url+">[PNo"+pnoFrom+" DAY"+day+"]</a> ");
+              
               foundFlg = true;
               return true;//eachのcontinue
             }
           });
-          
-          if (foundFlg == true){
-            loadingSelector.text("[取得完了]");
-            setTimeout(insertNextLink, nextLinkInterval);
+
+          //FromとToが異なるならば、逆側も取得する。
+          if (pnoFrom != pnoTo){
+            //関数化がセオリーだが微妙に違って面倒なので同じ処理を二回書きます（たいてい後で後悔するパターンです　良い子はマネしないように）
+            var url2 = getURL(day, pnoTo);
+            $.get( url2, function(data,status){
+              if (status == "success"){
+                //該当メッセージを探し出す
+                //複数該当する場合は複数持ってくる
+                $(data).find("div.MessagePost").each(function(){
+                  var sendingText = $(this).text();
+                  if ( sendingText.includes("にメッセージを送った。")  ){
+                    return true;//eachのcontinue
+                  }
+                  var ankerTag = $(this).prev("a");
+                  ankerTag.children("br").remove();
+                  var senderPNo = getPNoFromURL(ankerTag.attr("href"));
+                  if (senderPNo == pnoFrom){
+                    ankerTag.attr("href", getURL(day,senderPNo) );
+                    var nextInsertAfterElement = loadingSelector;
+                    var nextDiv = $(this).next("div");
+                    for(var i = 0; i < 100; i++) {
+                      //div.Wordsを続く限り取得(Limitあり)
+                      if ( nextDiv && nextDiv.attr("class") != "MessagePost"){
+                        nextDivTmp = nextDiv.next("div");
+                        nextInsertAfterElement.after(nextDiv);
+                        nextInsertAfterElement = nextDiv;
+                        nextDiv = nextDivTmp;
+                      }else{
+                        break;
+                      }
+                    }
+                    loadingSelector.after( $(this) );
+                    loadingSelector.after( ankerTag );
+                    foundFlg = true;
+                    return true;//eachのcontinue
+                  }
+                });
+                
+                if (foundFlg == true){
+                  loadingSelector.text("[取得完了]");
+                  loadingSelector.after("<a href="+url+">[PNo"+pnoFrom+" DAY"+day+"]</a> ");
+                  setTimeout(insertNextLink, nextLinkInterval);
+                }else{
+                  loadingSelector.text("[DAY"+day+"のメッセージはありませんでした]");
+                  loadingSelector.after("<a href="+url+">[PNo"+pnoFrom+" DAY"+day+"]</a> メッセージなし<br/>");
+                  setTimeout(insertNextLink, nextLinkInterval);
+                }
+                //ログ取得成功時の処理ここまで
+              }else{
+                loadingSelector.text("[一部取得に失敗しました]");
+                setTimeout(insertNextLink, nextLinkInterval);
+              }
+            });
           }else{
-            loadingSelector.before("<a href="+url+">[PNo"+pnoFrom+" DAY"+day+"]</a> ");
-            loadingSelector.text("[これ以上前のメッセージはありません]");
+            if (foundFlg == true){
+              loadingSelector.text("[取得完了]");
+              loadingSelector.after("<a href="+url+">[PNo"+pnoFrom+" DAY"+day+"]</a> ");
+              setTimeout(insertNextLink, nextLinkInterval);
+            }else{
+              loadingSelector.after("<a href="+url+">[PNo"+pnoFrom+" DAY"+day+"]</a> メッセージなし<br/>");
+              loadingSelector.text("[DAY"+day+"のメッセージはありませんでした]");
+              setTimeout(insertNextLink, nextLinkInterval);
+            }
           }
+          
+          
           //ログ取得成功時の処理ここまで
         }else{
           loadingSelector.text("[取得に失敗しました]");
+          setTimeout(insertNextLink, nextLinkInterval);
         }
       });
 
       function insertNextLink(){
         //更に前のメッセージのリンクを挿入する
         //TO FROMを逆転させて次へのリンクを用意
-        insertResLink(loadingSelector,pnoTo,pnoFrom,nextURLKey,nextDay);
+        insertResLinkBar(loadingSelector,pnoTo,pnoFrom,nextDay,bUpstreamNext);
         loadingSelector.remove();
       }
     });
